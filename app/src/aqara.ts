@@ -202,6 +202,31 @@ export async function writeAttr(attr: string, value: any, subjectId: string): Pr
   return res.data;
 }
 
+/**
+ * Camera Hub G3 (cloud model `lumi.camera.gwpgl1` / `gwpagl01`): its P2P daemon has
+ * no motor IOCTL (0x102A answers "unsupport cmd"), so PTZ goes through the cloud,
+ * the way Aqara Home drives it.
+ */
+export function usesCloudPtz(model: string): boolean {
+  const m = (model || "").toLowerCase();
+  return m.includes("gwpgl1") || m.includes("gwpagl01");
+}
+
+/** One momentary PTZ nudge (`left`/`right`/`up`/`down`) or `stop` via the cloud. */
+export async function cloudPtz(
+  did: string,
+  action: string,
+  post: (url: string, body: unknown) => Promise<{ data?: { code?: number } }> = (url, body) =>
+    api.post(url, body),
+): Promise<void> {
+  const res = await post("/app/v1.0/lumi/devex/camera/operate", {
+    did,
+    method: "ctrl_ptz",
+    params: { action },
+  });
+  if (res.data?.code !== 0) throw Error(`Aqara rejected PTZ ${action} (code=${res.data?.code})`);
+}
+
 /** One live-quality option from cloud (Aqara Home's 1520p / 1080p / Low list). */
 export type CameraStreamQuality = {
   title: string;

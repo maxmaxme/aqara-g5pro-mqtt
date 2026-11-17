@@ -12,7 +12,13 @@ import { AqaraCameraBridge, getLocalIpv4 } from "./bridge.js";
 import { resolveCameraIp } from "./camera-ip.js";
 import "./config.js";
 import { promises as fs } from "node:fs";
-import { getCameraStreamQualities, pickMaxStreamQuality, jsonQualityChannel } from "./aqara.js";
+import {
+  getCameraStreamQualities,
+  pickMaxStreamQuality,
+  jsonQualityChannel,
+  usesCloudPtz,
+  cloudPtz,
+} from "./aqara.js";
 import {
   publishCameraDiscovery,
   publishDiscovery,
@@ -130,7 +136,8 @@ function supportsPtz(model: string): boolean {
     m.includes("g3") ||
     m.includes("ptz") ||
     m.includes("pan") ||
-    m.includes("tilt")
+    m.includes("tilt") ||
+    usesCloudPtz(m)
   );
 }
 
@@ -763,7 +770,11 @@ async function executeCameraCommand(topic: string, msg: Buffer) {
   if (domain === "button" && attr.startsWith("ptz_")) {
     const dir = attr.replace(/^ptz_/, "");
     console.log(`🕹️ [PTZ] ${cameraInfo.device.deviceName} → ${dir}`);
-    if (!cameraInfo.bridge) {
+    if (usesCloudPtz(cameraInfo.device.model)) {
+      await cloudPtz(cameraInfo.device.did, dir).catch((e) =>
+        console.warn(`⚠️ [PTZ] ${cameraInfo.device.deviceName}: ${e.message}`),
+      );
+    } else if (!cameraInfo.bridge) {
       console.warn(
         `⚠️ [PTZ] P2P stream not active for ${cameraInfo.device.deviceName}; start it first`,
       );
